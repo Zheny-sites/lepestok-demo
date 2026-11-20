@@ -243,12 +243,6 @@ input:focus,textarea:focus{border-color:var(--rose)}
   <div class="pad" id="cBody"></div>
 </div>
 
-<form name="order" method="POST" data-netlify="true" netlify-honeypot="bot-field" hidden>
-  <input type="hidden" name="form-name" value="order">
-  <input name="bot-field"><input name="name"><input name="phone"><input name="total">
-  <textarea name="note"></textarea><textarea name="order"></textarea>
-</form>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -383,15 +377,8 @@ function submitOrder(e){
   var lines=Object.keys(cart).map(function(k){var p=byId(+k);return p?esc(p.name)+" × "+cart[k]:"";}).filter(Boolean);
   var total=sum();
   var btn=$("sendBtn");btn.disabled=true;btn.textContent="Отправляем...";
-  var body=new URLSearchParams();
-  body.append("form-name","order");
-  body.append("bot-field","");
-  body.append("name",name);
-  body.append("phone",phone);
-  body.append("note",note);
-  body.append("order",plain.join("\n"));
-  body.append("total",total+" руб.");
-  fetch("/",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()})
+  var payload={name:name,phone:phone,note:note,total:total+" руб.",items:plain,website:""};
+  fetch("/.netlify/functions/order",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
   .then(function(r){
     if(!r.ok)throw new Error("send failed");
     var h='<div class="ok"><div class="e">✅</div><h2>Заказ отправлен</h2>'+
