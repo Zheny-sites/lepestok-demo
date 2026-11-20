@@ -225,7 +225,7 @@ input:focus,textarea:focus{border-color:var(--rose)}
   </section>
 </main>
 
-<div class="demo">Демонстрационный сайт. Название, цены и контакты вымышленные. Заказы никуда не отправляются.<br>Фото: Unsplash.</div>
+<div class="demo">Демонстрационный сайт. Название, цены и контакты вымышленные.<br>Фото: Unsplash.</div>
 
 <button class="cbar" id="cartBar"><span><span class="n" id="cbN">0</span>Смотреть корзину</span><span id="cbSum">0 ₽</span></button>
 
@@ -242,6 +242,12 @@ input:focus,textarea:focus{border-color:var(--rose)}
   <button class="close" data-close aria-label="Закрыть">✕</button>
   <div class="pad" id="cBody"></div>
 </div>
+
+<form name="order" method="POST" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <input type="hidden" name="form-name" value="order">
+  <input name="bot-field"><input name="name"><input name="phone"><input name="total">
+  <textarea name="note"></textarea><textarea name="order"></textarea>
+</form>
 
 <div class="toast" id="toast"></div>
 
@@ -357,7 +363,9 @@ function renderCart(){
    '<label for="fPhone">Номер телефона</label><input id="fPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 900 000-00-00">'+
    '<div class="err" id="ePhone">Введите телефон полностью, не меньше 10 цифр</div>'+
    '<label for="fNote">Комментарий (необязательно)</label><textarea id="fNote" rows="2" placeholder="Например: заберу после 18:00"></textarea>'+
-   '<button class="btn" type="submit">Оформить заказ на самовывоз</button></form>';
+   '<div class="err" id="eSend">Не удалось отправить заказ. Проверьте интернет или позвоните нам.</div>'+
+   '<button class="btn" type="submit" id="sendBtn">Оформить заказ на самовывоз</button></form>'+
+   '<a class="btn alt" href="tel:+79000000000" style="text-decoration:none">📞 Или позвоните в магазин</a>';
   $("cBody").innerHTML=h;
   $("orderForm").addEventListener("submit",submitOrder);
 }
@@ -369,20 +377,38 @@ function submitOrder(e){
   var okN=name.length>=2,okP=digits.length>=10&&digits.length<=12;
   $("eName").style.display=okN?"none":"block";
   $("ePhone").style.display=okP?"none":"block";
+  $("eSend").style.display="none";
   if(!okN||!okP)return;
+  var plain=Object.keys(cart).map(function(k){var p=byId(+k);return p?p.name+" x "+cart[k]+" = "+(p.price*cart[k])+" руб.":"";}).filter(Boolean);
   var lines=Object.keys(cart).map(function(k){var p=byId(+k);return p?esc(p.name)+" × "+cart[k]:"";}).filter(Boolean);
   var total=sum();
-  /* ДЕМО: здесь позже будет отправка заказа владельцу (Telegram) */
-  var h='<div class="ok"><div class="e">✅</div><h2>Заказ оформлен (демо)</h2>'+
-    '<p class="desc">'+esc(name)+', в реальном магазине мы бы позвонили вам по номеру '+esc(phone)+' и подтвердили время самовывоза.</p></div>'+
-    '<div class="item" style="display:block"><b>Состав заказа</b><br><span style="color:var(--muted);font-size:14px">'+lines.join("<br>")+'</span>'+
-    (note?'<br><span style="font-size:13px;color:var(--muted)">Комментарий: '+esc(note)+'</span>':'')+
-    '<div class="total" style="margin:10px 0 0"><span>Итого</span><span>'+money(total)+'</span></div></div>'+
-    '<div class="note">Это демо-версия: заказ никуда не отправлен. Отправку владельцу в Telegram подключим на следующем этапе.</div>'+
-    '<button class="btn" data-done>Закрыть</button>';
-  cart={};save();updBadge();
-  $("cBody").innerHTML=h;
-  $("cSheet").scrollTop=0;
+  var btn=$("sendBtn");btn.disabled=true;btn.textContent="Отправляем...";
+  var body=new URLSearchParams();
+  body.append("form-name","order");
+  body.append("bot-field","");
+  body.append("name",name);
+  body.append("phone",phone);
+  body.append("note",note);
+  body.append("order",plain.join("\n"));
+  body.append("total",total+" руб.");
+  fetch("/",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()})
+  .then(function(r){
+    if(!r.ok)throw new Error("send failed");
+    var h='<div class="ok"><div class="e">✅</div><h2>Заказ отправлен</h2>'+
+      '<p class="desc">'+esc(name)+', спасибо! Мы позвоним вам по номеру '+esc(phone)+' и подтвердим время самовывоза.</p></div>'+
+      '<div class="item" style="display:block"><b>Состав заказа</b><br><span style="color:var(--muted);font-size:14px">'+lines.join("<br>")+'</span>'+
+      (note?'<br><span style="font-size:13px;color:var(--muted)">Комментарий: '+esc(note)+'</span>':'')+
+      '<div class="total" style="margin:10px 0 0"><span>Итого</span><span>'+money(total)+'</span></div></div>'+
+      '<a class="btn alt" href="tel:+79000000000" style="text-decoration:none">📞 Позвонить в магазин</a>'+
+      '<button class="btn" data-done>Закрыть</button>';
+    cart={};save();updBadge();
+    $("cBody").innerHTML=h;
+    $("cSheet").scrollTop=0;
+  })
+  .catch(function(){
+    btn.disabled=false;btn.textContent="Оформить заказ на самовывоз";
+    $("eSend").style.display="block";
+  });
 }
 
 /* события */
